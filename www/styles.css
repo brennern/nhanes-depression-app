@@ -1,0 +1,57 @@
+.well {
+    padding: 20px;
+    border-radius: 8px; 
+    box-shadow: 0px 2px 5px rgba(0,0,0,0.1);
+    background-color: #f9f9f9;
+    transition: background-color 0.3s ease;
+}
+
+.well:hover {
+    background-color: #f2f2f2;
+}
+
+#data_type_info {
+    color: #007bff;
+    transition: color 0.3s ease;
+}
+
+#data_type_info:hover {
+    color: #000000;
+}
+
+.nav-tabs > li > a,
+.tabbable .nav-tabs > li > a {
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.nav-tabs > li > a:hover,
+.tabbable .nav-tabs > li > a:hover {
+    background-color: #f0f0f0; /* Light gray background on hover */
+    color: #0056b3; /* Change to a darker shade of blue on hover */
+}
+
+.nav-tabs > li.active > a,
+.nav-tabs > li.active > a:focus,
+.nav-tabs > li.active > a:hover,
+.tabbable .nav-tabs > li.active > a,
+.tabbable .nav-tabs > li.active > a:focus,
+.tabbable .nav-tabs > li.active > a:hover {
+    background-color: #e0e0e0; /* Slightly darker gray for active tab */
+    color: #003366; /* Darker blue for active tab text */
+}
+
+.navbar-nav > li > a {
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.navbar-nav > li > a:hover {
+    background-color: #e0e0e0; /* Light gray background on hover */
+    color: #0056b3; /* Darker blue text on hover */
+}
+
+.navbar-nav > li.active > a,
+.navbar-nav > li.active > a:hover,
+.navbar-nav > li.active > a:focus {
+    background-color: #d0d0d0; /* Darker gray for active tab */
+    color: #003366; /* Darker blue text for active tab */
+}
