@@ -31,6 +31,14 @@ library(broom)
 library(kernlab)
 library(xgboost)
 library(shinydashboard)
+library(tibble)
+library(rstatix)
+library(shinyBS)
+library(memoise)
+library(ranger)
+library(future)
+library(promises)
+library(future.callr)
 #####################
 
 ### HELPER FILES ###
@@ -131,11 +139,15 @@ dat <- dat |>
     GLA_Omega_6 = lbxgla,
     Copper = lbxscu,
     Saturated_Fatty_Acids = lbxpm1
-  )
+  ) |> 
+  select(Total_Depression_Score, Depression_Category, Race, Education, SES, Gender, Age, Vitamin_D, White_Blood_Cells, Glucose, GLA_Omega_6, Copper, Saturated_Fatty_Acids, Protein, dr1tsugr, dr1tcarb, Fiber, Cholesterol, Sodium, dr1tmois, TotalCalories, dr1tsfat, dr1tmfat, dr1tpfat, dr1talco, dr1ts100)
 
 # Parquet File Creation
 write_parquet(dat, "dat.parquet")
 ###############################
+
+# set seed
+set.seed(123)
 
 ##### UI #####
 ui <- fluidPage(
@@ -365,8 +377,8 @@ ui <- fluidPage(
               icon("question-circle", id = "choice_info", style = "margin-left: 5px; color: #007bff; cursor: pointer;"),
               selectInput("choice",
                           label = NULL,
-                          choices = c(3,4,5,6,7),
-                          selected = 5),
+                          choices = c(3,4,5),
+                          selected = 3),
               bsPopover("choice_info", title = "",
                         content = "Choose the number of dimensions/features for the dimensionality reduction. Choosing a low number of dimensions will attempt to capture the variance of the dataset in few features, and choosing a high number will ensure variance capture but with many features.",
                         placement = "right", trigger = "click",
@@ -701,9 +713,7 @@ ui <- fluidPage(
 server <- function(input, output) {
   
   # Function to read in parquet data
-  dat_parquet <- reactive({
-    read_parquet("dat.parquet")
-  })
+  dat_parquet <- read_parquet("dat.parquet")
   
   ##### TAB 1 #####
   
@@ -716,7 +726,7 @@ server <- function(input, output) {
       plot_var = input$plot_var,
       plot_var2 = input$plot_var2,
       plot_type = input$plot_type,
-      data_source = dat_parquet()
+      data_source = dat_parquet
     )
     
   })
@@ -785,7 +795,7 @@ server <- function(input, output) {
   output$boxPlot <- renderPlot({
     
     if (is.null(input$plot_button) || input$plot_button == 0) {
-      data_source <- dat_parquet()  # Load data for default plot
+      data_source <- dat_parquet  # Load data for default plot
       default_data <- data_source |> filter(!is.na(Race))  # Filter out NA values for Race
       comparisons <- get_significant_comparisons("Demographic", default_data, "Race")
       return(create_default_boxplot(default_data, comparisons))
@@ -834,7 +844,7 @@ server <- function(input, output) {
   
   reactive_coef_data <- eventReactive(input$coefficient_button, {
     
-    data_source <- dat_parquet()
+    data_source <- dat_parquet
     
     data_source$Race <- relevel(factor(data_source$Race), ref = input$ref_race)
     data_source$Education <- relevel(factor(data_source$Education), ref = input$ref_education)
@@ -891,7 +901,7 @@ server <- function(input, output) {
   
   output$coefficientPlot <- renderPlot({
     if (is.null(input$coefficient_button) || input$coefficient_button == 0) {
-      default_data <- dat_parquet()
+      default_data <- dat_parquet
       return(create_default_coefficient_plot(default_data))
     }
   })
@@ -938,64 +948,71 @@ server <- function(input, output) {
       choice = input$choice,
       color = input$plotly_color,
       density_var = input$density_var,
-      data_source = dat_parquet()
+      data_source = dat_parquet
     )
     
   })
   
   output$clusterPlot_all <- renderPlot({
     
+    set.seed(123)
+    
     if (is.null(input$pca_button) || input$pca_button == 0) {
-      data_source <- dat_parquet()  # Load data for default plot
-      return(create_default_cluster(data_source))
+        return(create_default_cluster(dat_parquet))
+    } else {
+      
+      pca_data <- reactive_pca_data()
+      data_type_pca <- pca_data$data_type_pca
+      choice <- as.numeric(pca_data$choice)
+      data_source <- pca_data$data_source
+    
+      if (data_type_pca == "Demographic") {
+        create_mca_cluster(data_source, choice)
+      } else if (data_type_pca == "Dietary") {
+        create_pca_cluster("Dietary", data_source, choice)
+      } else if (data_type_pca == "Laboratory") {
+        create_pca_cluster("Laboratory", data_source, choice)
+      } else if (data_type_pca == "Mixed") {
+        create_famd_cluster(data_source, choice)
+      }
+
     }
-    
-    pca_data <- reactive_pca_data()
-    data_type_pca <- pca_data$data_type_pca
-    choice <- as.numeric(pca_data$choice)
-    data_source <- pca_data$data_source
-    
-    if (data_type_pca == "Demographic") {
-      create_mca_cluster(data_source, choice)
-    } else if (data_type_pca == "Dietary") {
-      create_pca_cluster(data_type = "Dietary", data = data_source, choice = choice)
-    } else if (data_type_pca == "Laboratory") {
-      create_pca_cluster(data_type = "Laboratory", data = data_source, choice = choice)
-    } else if (data_type_pca == "Mixed") {
-      create_famd_cluster(data_source, choice)
-    }
-    
   })
-  
+
   output$movingPlot_all <- renderPlotly({
     
+    set.seed(123)
+    
     if (is.null(input$pca_button) || input$pca_button == 0) {
-      data_source <- dat_parquet()  # Load data for default plot
-      return(create_default_plotly(data_source))
-    }
-    
-    pca_data <- reactive_pca_data()
-    data_type_pca <- pca_data$data_type_pca
-    choice <- as.numeric(pca_data$choice)
-    color <- pca_data$color
-    data_source <- pca_data$data_source
-    
-    if (data_type_pca == "Demographic") {
-      create_mca_plotly(data_source, choice, color)
-    } else if (data_type_pca == "Dietary") {
-      create_pca_plotly(data_type = "Dietary", data_source, choice, color)
-    } else if (data_type_pca == "Laboratory") {
-      create_pca_plotly(data_type = "Laboratory", data_source, choice, color)
-    }else if (data_type_pca == "Mixed") {
-      create_famd_plotly(data_source, choice, color)
+        return(create_default_plotly(dat_parquet))
+    } else {
+      
+      pca_data <- reactive_pca_data()
+      data_type_pca <- pca_data$data_type_pca
+      choice <- as.numeric(pca_data$choice)
+      color <- pca_data$color
+      data_source <- pca_data$data_source
+
+      if (data_type_pca == "Demographic") {
+        create_mca_plotly(data_source, choice, color)
+      } else if (data_type_pca == "Dietary") {
+        create_pca_plotly("Dietary", data_source, choice, color)
+      } else if (data_type_pca == "Laboratory") {
+        create_pca_plotly("Laboratory", data_source, choice, color)
+      } else if (data_type_pca == "Mixed") {
+        create_famd_plotly(data_source, choice, color)
+      }
+
     }
   })
   
+
   output$loadingHeatmapPlot_all <- renderPlot({
     
+    set.seed(123)
+    
     if (is.null(input$pca_button) || input$pca_button == 0) {
-      data_source <- dat_parquet()  # Load data for default plot
-      return(create_default_loading_heatmap(data_source))
+      return(create_default_loading_heatmap(dat_parquet))
     }
     
     pca_data <- reactive_pca_data()
@@ -1017,34 +1034,39 @@ server <- function(input, output) {
   
   output$densityPlot_all <- renderPlotly({
     
+    set.seed(123)
+    
     if (is.null(input$pca_button) || input$pca_button == 0) {
-      data_source <- dat_parquet()  # Load data for default plot
-      return(create_default_density_plots(data_source))
-    }
-    
-    pca_data <- reactive_pca_data()
-    data_type_pca <- pca_data$data_type_pca
-    choice <- as.numeric(pca_data$choice)
-    color <- pca_data$color
-    data_source <- pca_data$data_source
-    density_var <- pca_data$density_var
-    
-    if (data_type_pca == "Demographic") {
-      create_mca_density_plots(data_source, choice, density_var)
-    } else if (data_type_pca == "Dietary") {
-      create_pca_density_plots(data_type = "Dietary", data_source)
-    } else if (data_type_pca == "Laboratory") {
-      create_pca_density_plots(data_type = "Laboratory", data_source)
-    } else if (data_type_pca == "Mixed") {
-      create_famd_density_plots(data_source, choice, density_var)
+        return(create_default_density_plots(dat_parquet))
+    } else {
+      
+      pca_data <- reactive_pca_data()
+      data_type_pca <- pca_data$data_type_pca
+      choice <- as.numeric(pca_data$choice)
+      color <- pca_data$color
+      data_source <- pca_data$data_source
+      density_var <- pca_data$density_var
+      
+      if (data_type_pca == "Demographic") {
+        create_mca_density_plots(data_source, choice, density_var)
+      } else if (data_type_pca == "Dietary") {
+        create_pca_density_plots("Dietary", data_source)
+      } else if (data_type_pca == "Laboratory") {
+        create_pca_density_plots("Laboratory", data_source)
+      } else if (data_type_pca == "Mixed") {
+        create_famd_density_plots(data_source, choice, density_var)
+      }
+
     }
   })
   
+  
   output$clusterPlot <- renderPlot({
     
+    set.seed(123)
+    
     if (is.null(input$pca_button) || input$pca_button == 0) {
-      data_source <- dat_parquet()  # Load data for default plot
-      return(create_default_cluster(data_source))
+      return(create_default_cluster(dat_parquet))
     }
     
     pca_data <- reactive_pca_data()
@@ -1066,9 +1088,10 @@ server <- function(input, output) {
   
   output$movingPlot <- renderPlotly({
     
+    set.seed(123)
+    
     if (is.null(input$pca_button) || input$pca_button == 0) {
-      data_source <- dat_parquet()  # Load data for default plot
-      return(create_default_plotly(data_source))
+      return(create_default_plotly(dat_parquet))
     }
     
     pca_data <- reactive_pca_data()
@@ -1083,16 +1106,17 @@ server <- function(input, output) {
       create_pca_plotly(data_type = "Dietary", data_source, choice, color)
     } else if (data_type_pca == "Laboratory") {
       create_pca_plotly(data_type = "Laboratory", data_source, choice, color)
-    }else if (data_type_pca == "Mixed") {
+    } else if (data_type_pca == "Mixed") {
       create_famd_plotly(data_source, choice, color)
     }
   })
   
   output$loadingHeatmapPlot <- renderPlot({
     
+    set.seed(123)
+    
     if (is.null(input$pca_button) || input$pca_button == 0) {
-      data_source <- dat_parquet()  # Load data for default plot
-      return(create_default_loading_heatmap(data_source))
+      return(create_default_loading_heatmap(dat_parquet))
     }
     
     pca_data <- reactive_pca_data()
@@ -1114,9 +1138,10 @@ server <- function(input, output) {
   
   output$densityPlot <- renderPlotly({
     
+    set.seed(123)
+    
     if (is.null(input$pca_button) || input$pca_button == 0) {
-      data_source <- dat_parquet()  # Load data for default plot
-      return(create_default_density_plots(data_source))
+      return(create_default_density_plots(dat_parquet))
     }
     
     pca_data <- reactive_pca_data()
@@ -1159,7 +1184,7 @@ server <- function(input, output) {
       copper = input$copper,
       saturated_fats = input$saturated_fats,
       model_type = input$model_type,
-      data_source = dat_parquet()
+      data_source = dat_parquet
     )
     
   })
@@ -1167,7 +1192,8 @@ server <- function(input, output) {
   output$predScoreBox <- renderInfoBox({
     
     if (is.null(input$pred_button) || input$pred_button == 0) {
-      data_source <- dat_parquet()  # Load data for default plot
+      set.seed(123)
+      data_source <- dat_parquet  # Load data for default plot
       lm_fit <- default_develop_prediction_model(data_source)
       prediction <- predict(lm_fit, default_test_data)
       return(infoBox(
@@ -1197,13 +1223,13 @@ server <- function(input, output) {
     copper <- pred_data$copper
     saturated_fats <- pred_data$saturated_fats
     model_type <- pred_data$model_type
-    data_source <- dat_parquet()
+    data_source <- dat_parquet
     
     set.seed(123)
     
     lm_fit <- develop_prediction_model(data = data_source, model_type)
     
-    test_data <- tibble(
+    test_data <- tibble::tibble(
       Race = factor(race_pred, levels = c("Mexican American", "Other Hispanic", "NH White", "NH Black", "NH Asian", "Other Race including Multi-Racial")),
       Education = factor(education_pred, levels = c("Less than 9th grade", "9-11th grade", "High school graduate/GED or equivalent", "Some college or AA degree", "College graduate or above")),
       SES = factor(ses_pred, levels = c("Low SES", "Middle SES", "High SES")),
@@ -1237,7 +1263,7 @@ server <- function(input, output) {
   output$modelPerformancePlot <- renderPlot({
     
     if (is.null(input$pred_button) || input$pred_button == 0) {
-      data_source <- dat_parquet()  # Load data for default plot
+      data_source <- dat_parquet  # Load data for default plot
       lm_fit <- default_develop_prediction_model(data_source)
       return(default_create_model_performance_plot(data_source, lm_fit))
     }
@@ -1246,7 +1272,7 @@ server <- function(input, output) {
     model_type <- pred_data$model_type
     data_source <- pred_data$data_source
     
-    lm_fit <- develop_prediction_model(data = dat, model_type)
+    lm_fit <- develop_prediction_model(data = data_source, model_type)
     
     create_model_performance_plot(data_source, lm_fit)
     
@@ -1256,7 +1282,7 @@ server <- function(input, output) {
   output$predictedVsActualPlot <- renderPlot({
     
     if (is.null(input$pred_button) || input$pred_button == 0) {
-      data_source <- dat_parquet()  # Load data for default plot
+      data_source <- dat_parquet  # Load data for default plot
       lm_fit <- default_develop_prediction_model(data_source)
       return(create_predicted_vs_actual_plot(data_source, lm_fit))
     }
@@ -1265,7 +1291,7 @@ server <- function(input, output) {
     model_type <- pred_data$model_type
     data_source <- pred_data$data_source
     
-    lm_fit <- develop_prediction_model(data = dat, model_type)
+    lm_fit <- develop_prediction_model(data = data_source, model_type)
     
     create_predicted_vs_actual_plot(data_source, lm_fit)
     
@@ -1274,7 +1300,7 @@ server <- function(input, output) {
   output$overlappingResidualPlot <- renderPlotly({
     
     if (is.null(input$pred_button) || input$pred_button == 0) {
-      data_source <- dat_parquet()  # Load data for default plot
+      data_source <- dat_parquet  # Load data for default plot
       residuals_data <- create_residual_data(data_source)
       return(create_overlapping_residual_plot(residuals_data))
     }
@@ -1290,7 +1316,7 @@ server <- function(input, output) {
   output$facetedResidualPlot <- renderPlot({
     
     if (is.null(input$pred_button) || input$pred_button == 0) {
-      data_source <- dat_parquet()  # Load data for default plot
+      data_source <- dat_parquet  # Load data for default plot
       residuals_data <- create_residual_data(data_source)
       return(create_facet_wrap_overlapping_residual_plot(residuals_data))
     }
