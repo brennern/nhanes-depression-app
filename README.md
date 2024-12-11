@@ -18,16 +18,20 @@ This dimensionality reduction tab allows users to explore complex relationships 
 
 ## Tab 4: Depression Score Prediction and Model Comparison
 ![Score Prediction Tab](images/tab4_screenshot.png)
-This tab provides predictive modeling tools to estimate depression scores based on demographic, dietary, and laboratory variables. Users can select from a wide variety of prediction algorithms, including linear regression, tree-based models (random forest, decision trees, and gradient boosting machines), and other machine learning algorithms (support vector machines and neural networks). This tab also includes model comparison visualizations, such as residual plots and predicted vs. actual score comparisons between model types, which can guide users in selecting the best prediction algorithm.
+This tab provides predictive modeling tools to estimate depression scores based on demographic, dietary, and laboratory variables. Users can select from a wide variety of prediction algorithms, including linear regression, tree-based models (random forest, decision trees, and gradient boosting machines), and other machine learning algorithms (support vector machines and neural networks).
+
+
+![Score Prediction Tab](images/tab4_screenshot2.png)
+The second page on this tab includes model comparison visualizations through overlaying residual plots between model types, which can guide users in selecting the best prediction algorithm.
+
 
 ## Dependencies
-The primary packages utilized in this app are {[shiny](https://shiny.posit.co/)} (for web app development and interactivity), {[tidyverse](https://www.tidyverse.org/)} (data pre-processing and data visualization), {[tidymodels](https://www.tidymodels.org/)} (for predictive modeling), and {[RNHANES](https://github.com/SilentSpringInstitute/RNHANES)}. The {RNHANES} package allows for the direct downloading of the required NHANES data for the analysis, so no extra data setup steps are required for the user. Here is a full list of the dependencies for this app:
+The primary packages utilized in this app are {[shiny](https://shiny.posit.co/)} (for web app development and interactivity), {[tidyverse](https://www.tidyverse.org/)} (data pre-processing and data visualization), and {[tidymodels](https://www.tidymodels.org/)} (for predictive modeling). Here is a full list of the dependencies for this app:
 ```r
 library(shiny)
 library(shinythemes)
 library(shinydashboard)
 library(shinycssloaders)
-library(RNHANES)
 library(tidyverse)
 library(janitor)
 library(gtsummary)
