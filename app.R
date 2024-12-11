@@ -10,6 +10,7 @@
 ##### LIBRARIES #####
 library(shiny)
 library(shinythemes)
+library(bslib)
 library(RNHANES)
 library(tidyverse)
 library(janitor)
@@ -39,6 +40,7 @@ library(ranger)
 library(future)
 library(promises)
 library(future.callr)
+library(viridisLite)
 #####################
 
 ### HELPER FILES ###
@@ -46,21 +48,21 @@ source("R/utils.R")
 ####################
 
 ##### DATA PRE-PROCESSING #####
-demo <- nhanes_load_data("DEMO_H", "2013-2014") |> 
+demo <- haven::read_xpt("www/DEMO_H.xpt") |> 
   clean_names()
-dep <- nhanes_load_data("DPQ_H", "2013-2014") |> 
+dep <- haven::read_xpt("www/DPQ_H.xpt") |> 
   clean_names()
-diet <- nhanes_load_data("DR1TOT_H", "2013-2014") |> 
+diet <- haven::read_xpt("www/DR1TOT_H.xpt") |> 
   clean_names()
-vitd <- nhanes_load_data("VID_H", "2013-2014") |> # vitamin d
+vitd <- haven::read_xpt("www/VID_H.xpt") |> # vitamin d
   clean_names()
-cbc <- nhanes_load_data("CBC_H", "2013-2014") |> # complete blood count
+cbc <- haven::read_xpt("www/CBC_H.xpt") |> # complete blood count
   clean_names()
-glu <- nhanes_load_data("GLU_H", "2013-2014") |> # glucose
+glu <- haven::read_xpt("www/GLU_H.xpt") |> # glucose
   clean_names()
-sel <- nhanes_load_data("CUSEZN_H", "2013-2014") |> # copper, selenium, and zinc
+sel <- haven::read_xpt("www/CUSEZN_H.xpt") |> # copper, selenium, and zinc
   clean_names()
-fatty <- nhanes_load_data("FAS_H", "2013-2014") |> # fatty acids
+fatty <- haven::read_xpt("www/FAS_H.xpt") |> # fatty acids
   clean_names()
 dataset_list <- list(demo, dep, diet, vitd, cbc, glu, sel, fatty)
 dat <- reduce(dataset_list, full_join, by = "seqn")
@@ -157,7 +159,7 @@ ui <- fluidPage(
   
   # Shiny Theme
   theme = shinytheme("yeti"),
-  
+
   # Application title
   div(
     style = "text-align: center;",
@@ -176,7 +178,7 @@ ui <- fluidPage(
         column(
           width = 10,
           offset = 1,
-          plotOutput("boxPlot", width = "100%", height = "600px") |> withSpinner(type = 6, color = "#007bff")
+          plotOutput("boxPlot", width = "100%", height = "600px") |> withSpinner(type = 1, color = "#1d0ed5")
         )
       ),
       
@@ -253,7 +255,7 @@ ui <- fluidPage(
         column(
           width = 10,
           offset = 1,
-          plotOutput("coefficientPlot") |> withSpinner(type = 6, color = "#007bff")
+          plotOutput("coefficientPlot", height = "600px") |> withSpinner(type = 1, color = "#1d0ed5")
         )
       ),
       
@@ -386,6 +388,20 @@ ui <- fluidPage(
             ),
             
             div(
+              tags$label("Select number of clusters:",
+                         `for` = "n_clusters"),
+              icon("question-circle", id = "n_clusters_info", style = "margin-left: 5px; color: #007bff; cursor: pointer;"),
+              selectInput("n_clusters",
+                          label = NULL,
+                          choices = c("Default" = NA, 2,3,4,5),
+                          selected = NA),
+              bsPopover("n_clusters_info", title = "",
+                        content = "Choose the number of clusters for the dimensionality reduction.",
+                        placement = "right", trigger = "click",
+                        options = list(container = "body"))
+            ),
+            
+            div(
               tags$label("Color data points by:",
                          `for` = "plotly_color"),
               icon("question-circle", id = "plotly_color_info", style = "margin-left: 5px; color: #007bff; cursor: pointer;"),
@@ -446,44 +462,47 @@ ui <- fluidPage(
               fluidRow(
                 column(
                   width = 6,
-                  plotOutput("clusterPlot_all") |> withSpinner(type = 6, color = "#007bff")
+                  plotOutput("clusterPlot_all") |> withSpinner(type = 1, color = "#1d0ed5")
                 ),
                 column(
                   width = 6,
-                  plotlyOutput("movingPlot_all") |> withSpinner(type = 6, color = "#007bff")
+                  plotlyOutput("movingPlot_all") |> withSpinner(type = 1, color = "#1d0ed5")
                 )
               ),
               
               fluidRow(
                 column(
-                  width = 6,
-                  plotOutput("loadingHeatmapPlot_all") |> withSpinner(type = 6, color = "#007bff")
-                ),
+                  width = 12,
+                  plotlyOutput("densityPlot_all") |> withSpinner(type = 1, color = "#1d0ed5"),
+                )
+              ),
+              
+              fluidRow(
                 column(
-                  width = 6,
-                  plotlyOutput("densityPlot_all") |> withSpinner(type = 6, color = "#007bff"),
-                ),
+                  width = 12,
+                  plotOutput("loadingHeatmapPlot_all") |> withSpinner(type = 1, color = "#1d0ed5")
+                )
               )
             ),
             
             tabPanel(
               "Cluster Analysis",
-              plotOutput("clusterPlot") |> withSpinner(type = 6, color = "#007bff")
+              plotOutput("clusterPlot") |> withSpinner(type = 1, color = "#1d0ed5")
             ),
             
             tabPanel(
               "3D Plotly Analysis",
-              plotlyOutput("movingPlot", height = "700px", width = "100%") |> withSpinner(type = 6, color = "#007bff")
+              plotlyOutput("movingPlot", height = "700px", width = "100%") |> withSpinner(type = 1, color = "#1d0ed5")
             ),
             
             tabPanel(
               "Loadings Analysis",
-              plotOutput("loadingHeatmapPlot") |> withSpinner(type = 6, color = "#007bff")
+              plotOutput("loadingHeatmapPlot") |> withSpinner(type = 1, color = "#1d0ed5")
             ),
             
             tabPanel(
               "Density Analysis",
-              plotlyOutput("densityPlot") |> withSpinner(type = 6, color = "#007bff")
+              plotlyOutput("densityPlot") |> withSpinner(type = 1, color = "#1d0ed5")
             )
             
           )
@@ -665,8 +684,9 @@ ui <- fluidPage(
               "Depression Score Prediction",
               fluidRow(
                 column(
-                  width = 5,
-                  infoBoxOutput("predScoreBox") |> withSpinner(type = 6, color = "#007bff")
+                  width = 12,
+                  offset = 1,
+                  htmlOutput("predScoreBox") |> withSpinner(type = 1, color = "#1d0ed5")
                 )
               ),
               
@@ -674,11 +694,11 @@ ui <- fluidPage(
                      fluidRow(
                        column(
                          width = 6,
-                         plotOutput("modelPerformancePlot") |> withSpinner(type = 6, color = "#007bff")
+                         plotOutput("modelPerformancePlot") |> withSpinner(type = 1, color = "#1d0ed5")
                        ),
                        column(
                          width = 6,
-                         plotOutput("predictedVsActualPlot") |> withSpinner(type = 6, color = "#007bff")
+                         plotOutput("predictedVsActualPlot") |> withSpinner(type = 1, color = "#1d0ed5")
                        )
                      )
               )
@@ -689,13 +709,13 @@ ui <- fluidPage(
               fluidRow(
                 column(
                   width = 12,
-                  plotlyOutput("overlappingResidualPlot", height = "400px") |> withSpinner(type = 6, color = "#007bff")
+                  plotlyOutput("overlappingResidualPlot", height = "400px") |> withSpinner(type = 1, color = "#1d0ed5")
                 )
               ),
               fluidRow(
                 column(
                   width = 12,
-                  plotOutput("facetedResidualPlot", height = "400px") |> withSpinner(type = 6, color = "#007bff")
+                  plotOutput("facetedResidualPlot", height = "400px") |> withSpinner(type = 1, color = "#1d0ed5")
                 )
               )
             )
@@ -948,6 +968,7 @@ server <- function(input, output) {
       choice = input$choice,
       color = input$plotly_color,
       density_var = input$density_var,
+      n_clusters = input$n_clusters,
       data_source = dat_parquet
     )
     
@@ -964,16 +985,17 @@ server <- function(input, output) {
       pca_data <- reactive_pca_data()
       data_type_pca <- pca_data$data_type_pca
       choice <- as.numeric(pca_data$choice)
+      n_clusters <- if (is.na(as.numeric(pca_data$n_clusters))) NULL else as.numeric(pca_data$n_clusters)
       data_source <- pca_data$data_source
     
       if (data_type_pca == "Demographic") {
-        create_mca_cluster(data_source, choice)
+        create_mca_cluster(data_source, choice, n_clusters)
       } else if (data_type_pca == "Dietary") {
-        create_pca_cluster("Dietary", data_source, choice)
+        create_pca_cluster("Dietary", data_source, choice, n_clusters)
       } else if (data_type_pca == "Laboratory") {
-        create_pca_cluster("Laboratory", data_source, choice)
+        create_pca_cluster("Laboratory", data_source, choice, n_clusters)
       } else if (data_type_pca == "Mixed") {
-        create_famd_cluster(data_source, choice)
+        create_famd_cluster(data_source, choice, n_clusters)
       }
 
     }
@@ -990,17 +1012,18 @@ server <- function(input, output) {
       pca_data <- reactive_pca_data()
       data_type_pca <- pca_data$data_type_pca
       choice <- as.numeric(pca_data$choice)
+      n_clusters <- if (is.na(as.numeric(pca_data$n_clusters))) NULL else as.numeric(pca_data$n_clusters)
       color <- pca_data$color
       data_source <- pca_data$data_source
 
       if (data_type_pca == "Demographic") {
-        create_mca_plotly(data_source, choice, color)
+        create_mca_plotly(data_source, choice, color, n_clusters)
       } else if (data_type_pca == "Dietary") {
-        create_pca_plotly("Dietary", data_source, choice, color)
+        create_pca_plotly("Dietary", data_source, choice, color, n_clusters)
       } else if (data_type_pca == "Laboratory") {
-        create_pca_plotly("Laboratory", data_source, choice, color)
+        create_pca_plotly("Laboratory", data_source, choice, color, n_clusters)
       } else if (data_type_pca == "Mixed") {
-        create_famd_plotly(data_source, choice, color)
+        create_famd_plotly(data_source, choice, color, n_clusters)
       }
 
     }
@@ -1072,16 +1095,17 @@ server <- function(input, output) {
     pca_data <- reactive_pca_data()
     data_type_pca <- pca_data$data_type_pca
     choice <- as.numeric(pca_data$choice)
+    n_clusters <- if (is.na(as.numeric(pca_data$n_clusters))) NULL else as.numeric(pca_data$n_clusters)
     data_source <- pca_data$data_source
     
     if (data_type_pca == "Demographic") {
-      create_mca_cluster(data_source, choice)
+      create_mca_cluster(data_source, choice, n_clusters)
     } else if (data_type_pca == "Dietary") {
-      create_pca_cluster(data_type = "Dietary", data = data_source, choice = choice)
+      create_pca_cluster(data_type = "Dietary", data = data_source, choice = choice, n_clusters)
     } else if (data_type_pca == "Laboratory") {
-      create_pca_cluster(data_type = "Laboratory", data = data_source, choice = choice)
+      create_pca_cluster(data_type = "Laboratory", data = data_source, choice = choice, n_clusters)
     } else if (data_type_pca == "Mixed") {
-      create_famd_cluster(data_source, choice)
+      create_famd_cluster(data_source, choice, n_clusters)
     }
     
   })
@@ -1097,17 +1121,18 @@ server <- function(input, output) {
     pca_data <- reactive_pca_data()
     data_type_pca <- pca_data$data_type_pca
     choice <- as.numeric(pca_data$choice)
+    n_clusters <- if (is.na(as.numeric(pca_data$n_clusters))) NULL else as.numeric(pca_data$n_clusters)
     color <- pca_data$color
     data_source <- pca_data$data_source
     
     if (data_type_pca == "Demographic") {
-      create_mca_plotly(data_source, choice, color)
+      create_mca_plotly(data_source, choice, color, n_clusters)
     } else if (data_type_pca == "Dietary") {
-      create_pca_plotly(data_type = "Dietary", data_source, choice, color)
+      create_pca_plotly(data_type = "Dietary", data_source, choice, color, n_clusters)
     } else if (data_type_pca == "Laboratory") {
-      create_pca_plotly(data_type = "Laboratory", data_source, choice, color)
+      create_pca_plotly(data_type = "Laboratory", data_source, choice, color, n_clusters)
     } else if (data_type_pca == "Mixed") {
-      create_famd_plotly(data_source, choice, color)
+      create_famd_plotly(data_source, choice, color, n_clusters)
     }
   })
   
@@ -1122,6 +1147,7 @@ server <- function(input, output) {
     pca_data <- reactive_pca_data()
     data_type_pca <- pca_data$data_type_pca
     choice <- as.numeric(pca_data$choice)
+    n_clusters <- as.numeric(pca_data$n_clusters)
     color <- pca_data$color
     data_source <- pca_data$data_source
     
@@ -1147,6 +1173,7 @@ server <- function(input, output) {
     pca_data <- reactive_pca_data()
     data_type_pca <- pca_data$data_type_pca
     choice <- as.numeric(pca_data$choice)
+    n_clusters <- as.numeric(pca_data$n_clusters)
     color <- pca_data$color
     data_source <- pca_data$data_source
     density_var <- pca_data$density_var
@@ -1189,75 +1216,71 @@ server <- function(input, output) {
     
   })
   
-  output$predScoreBox <- renderInfoBox({
-    
+  output$predScoreBox <- renderUI({
     if (is.null(input$pred_button) || input$pred_button == 0) {
+      # Default prediction before the button is clicked
       set.seed(123)
-      data_source <- dat_parquet  # Load data for default plot
+      data_source <- dat_parquet
       lm_fit <- default_develop_prediction_model(data_source)
       prediction <- predict(lm_fit, default_test_data)
-      return(infoBox(
-        "Predicted Depression Score",
-        paste0(round(prediction, 2)),
-        icon = icon("stethoscope"),
-        color = "blue",
-        fill = TRUE
-      ))
+      
+      div(
+        style = "font-size: 20px; font-weight: bold; text-align: center; margin: 10px;",
+        paste("Default Predicted Depression Score:", round(prediction, 2))
+      )
+      
+    } else {
+      # Prediction after the button is clicked
+      pred_data <- reactive_pred_data()
+      race_pred <- pred_data$race_pred
+      education_pred <- pred_data$education_pred
+      ses_pred <- pred_data$ses_pred
+      sex_pred <- pred_data$sex_pred
+      age_pred <- pred_data$age_pred
+      protein <- pred_data$protein
+      calories <- pred_data$calories
+      fiber <- pred_data$fiber
+      cholesterol <- pred_data$cholesterol
+      sodium <- pred_data$sodium
+      vitamin_d <- pred_data$vitamin_d
+      wbc <- pred_data$wbc
+      glucose <- pred_data$glucose
+      gla <- pred_data$gla
+      copper <- pred_data$copper
+      saturated_fats <- pred_data$saturated_fats
+      model_type <- pred_data$model_type
+      data_source <- dat_parquet
+      
+      set.seed(123)
+      lm_fit <- develop_prediction_model(data = data_source, model_type)
+      
+      test_data <- tibble::tibble(
+        Race = factor(race_pred, levels = c("Mexican American", "Other Hispanic", "NH White", "NH Black", "NH Asian", "Other Race including Multi-Racial")),
+        Education = factor(education_pred, levels = c("Less than 9th grade", "9-11th grade", "High school graduate/GED or equivalent", "Some college or AA degree", "College graduate or above")),
+        SES = factor(ses_pred, levels = c("Low SES", "Middle SES", "High SES")),
+        Gender = factor(sex_pred, levels = c("Male", "Female")),
+        Age = factor(age_pred, levels = c("Twenties", "Thirties", "Fourties", "Fifties", "Sixties", "Seventies and 80")),
+        Protein = protein,
+        TotalCalories = calories,
+        Fiber = fiber,
+        Cholesterol = cholesterol,
+        Sodium = sodium,
+        Vitamin_D = vitamin_d,
+        White_Blood_Cells = wbc,
+        Glucose = glucose,
+        GLA_Omega_6 = gla,
+        Copper = copper,
+        Saturated_Fatty_Acids = saturated_fats
+      )
+      
+      prediction <- predict(lm_fit, test_data)
+      
+      # Wrap the prediction in a div
+      div(
+        style = "font-size: 20px; font-weight: bold; text-align: center; margin: 10px;",
+        paste("Predicted Depression Score:", round(prediction, 2))
+      )
     }
-    
-    pred_data <- reactive_pred_data()
-    race_pred <- pred_data$race_pred
-    education_pred <- pred_data$education_pred
-    ses_pred <- pred_data$ses_pred
-    sex_pred <- pred_data$sex_pred
-    age_pred <- pred_data$age_pred
-    protein <- pred_data$protein
-    calories <- pred_data$calories
-    fiber <- pred_data$fiber
-    cholesterol <- pred_data$cholesterol
-    sodium <- pred_data$sodium
-    vitamin_d <- pred_data$vitamin_d
-    wbc <- pred_data$wbc
-    glucose <- pred_data$glucose
-    gla <- pred_data$gla
-    copper <- pred_data$copper
-    saturated_fats <- pred_data$saturated_fats
-    model_type <- pred_data$model_type
-    data_source <- dat_parquet
-    
-    set.seed(123)
-    
-    lm_fit <- develop_prediction_model(data = data_source, model_type)
-    
-    test_data <- tibble::tibble(
-      Race = factor(race_pred, levels = c("Mexican American", "Other Hispanic", "NH White", "NH Black", "NH Asian", "Other Race including Multi-Racial")),
-      Education = factor(education_pred, levels = c("Less than 9th grade", "9-11th grade", "High school graduate/GED or equivalent", "Some college or AA degree", "College graduate or above")),
-      SES = factor(ses_pred, levels = c("Low SES", "Middle SES", "High SES")),
-      Gender = factor(sex_pred, levels = c("Male", "Female")),
-      Age = factor(age_pred, levels = c("Twenties", "Thirties", "Fourties", "Fifties", "Sixties", "Seventies and 80")),
-      Protein = protein,
-      TotalCalories = calories,
-      Fiber = fiber,
-      Cholesterol = cholesterol,
-      Sodium = sodium,
-      Vitamin_D = vitamin_d,
-      White_Blood_Cells = wbc,
-      Glucose = glucose,
-      GLA_Omega_6 = gla,
-      Copper = copper,
-      Saturated_Fatty_Acids = saturated_fats
-    )
-    
-    prediction <- predict(lm_fit, test_data)
-    
-    infoBox(
-      "Predicted Depression Score",
-      paste0(round(prediction, 2)),
-      icon = icon("stethoscope"),
-      color = "blue",
-      fill = TRUE
-    )
-    
   })
   
   output$modelPerformancePlot <- renderPlot({
