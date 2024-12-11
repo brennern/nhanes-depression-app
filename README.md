@@ -16,11 +16,11 @@ The coefficient analysis tab provides insights into the relationships between va
 ![Dimensionality Reduction Tab](images/tab3_screenshot.png)
 This dimensionality reduction tab allows users to explore complex relationships in the NHANES dataset through various dimensionality reduction techniques, including PCA (Principal Component Analysis), MCA (Multiple Correspondence Analysis), and FAMD (Factor Analysis using Mixed Data). These procedures allow for the highlighting of clusters and patterns within demographic, dietary, and laboratory variables. Additionally, the loadings heatmap and density plots allows for a deeper analyses of variable distributions across clusters.
 
-## Tab 4: Depression Score Prediction and Model Comparison
+## Tab 4 Page 1: Depression Score Prediction
 ![Score Prediction Tab](images/tab4_screenshot.png)
 This tab provides predictive modeling tools to estimate depression scores based on demographic, dietary, and laboratory variables. Users can select from a wide variety of prediction algorithms, including linear regression, tree-based models (random forest, decision trees, and gradient boosting machines), and other machine learning algorithms (support vector machines and neural networks).
 
-
+## Tab 4 Page 2: Predictive Model Comparison
 ![Score Prediction Tab](images/tab4_screenshot2.png)
 The second page on this tab includes model comparison visualizations through overlaying residual plots between model types, which can guide users in selecting the best prediction algorithm.
 
