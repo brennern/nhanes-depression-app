@@ -30,9 +30,10 @@ library(ranger)
 library(future)
 library(promises)
 library(future.callr)
+library(viridisLite)
 #####################
 
-plan(callr)
+#plan(callr)
 
 ### FUNCTIONS ###
 
@@ -69,6 +70,10 @@ create_default_boxplot <- function(data, comparisons) {
     stat_compare_means(method = "wilcox.test",
                        comparisons = comparisons,
                        label = "p.signif") +
+    labs(
+      x = "Race",
+      y = "Total Depression Score"
+    ) +
     theme(
       axis.text.x = element_text(angle = 20, hjust = 1, vjust = 1),
       axis.title = element_text(size = rel(1.5)),
@@ -88,6 +93,10 @@ create_boxplot <- function(data, data_type, plot_var, comparisons) {
       stat_compare_means(method = "wilcox.test",
                          comparisons = comparisons,
                          label = "p.signif") +
+      labs(
+        x = "Race",
+        y = "Total Depression Score"
+      ) +
       theme(
         axis.text.x = element_text(angle = 20, hjust = 1, vjust = 1),
         axis.title = element_text(size = rel(1.5)),
@@ -104,6 +113,9 @@ create_boxplot <- function(data, data_type, plot_var, comparisons) {
       stat_compare_means(method = "wilcox.test",
                          comparisons = comparisons,
                          label = "p.signif") +
+      labs(
+        x = "Depression Category"
+      ) +
       theme(
         axis.text.x = element_text(angle = 20, hjust = 1, vjust = 1),
         axis.title = element_text(size = rel(1.5)),
@@ -124,6 +136,10 @@ create_violinplot <- function(data, data_type, plot_var, comparisons) {
       stat_compare_means(method = "wilcox.test",
                          comparisons = comparisons,
                          label = "p.signif") +
+      labs(
+        x = "Race",
+        y = "Total Depression Score"
+      ) +
       theme(
         axis.text.x = element_text(angle = 20, hjust = 1, vjust = 1),
         axis.title = element_text(size = rel(1.5)),
@@ -140,6 +156,9 @@ create_violinplot <- function(data, data_type, plot_var, comparisons) {
       stat_compare_means(method = "wilcox.test",
                          comparisons = comparisons,
                          label = "p.signif") +
+      labs(
+        x = "Depression Category"
+      ) +
       theme(
         axis.text.x = element_text(angle = 20, hjust = 1, vjust = 1),
         axis.title = element_text(size = rel(1.5)),
@@ -188,27 +207,52 @@ create_default_coefficient_plot <- function(data) {
   
   lm_coefficients <- lm_coefficients |> 
     filter(!is.na(term))
-  
-  #lm_coefficients$term <- factor(lm_coefficients$term, 
-                                 #levels = c("ridreth3Mexican American", "ridreth3NH Black", "ridreth3NH Asian", "ridreth3Other Race including Multi-Racial", "SESHigh SES", "SESLow SES", "dmdeduc29-11th grade", "dmdeduc2High school graduate/GED or equivalent", "dmdeduc2Some college or AA degree", "dmdeduc2College graduate or above", "(Intercept)"))
 
   max_estimate <- max(abs(lm_coefficients$estimate), na.rm = TRUE) + 2
   
+  lm_coefficients$direction <- ifelse(lm_coefficients$estimate > 0, "Positive", "Negative")
+  
+  lm_coefficients <- lm_coefficients %>%
+    mutate(
+      term = term %>%
+        gsub("(?<=SES)", " ", ., perl = TRUE) %>%  # Add space after "SES"
+        gsub("(?<=Race)", " ", ., perl = TRUE) %>%  # Add space after "Race"
+        gsub("(?<=Gender)", " ", ., perl = TRUE) %>%  # Add space after "Gender"
+        gsub("(?<=Education)", " ", ., perl = TRUE) %>%  # Add space after "Education"
+        gsub("(?<=Age)", " ", ., perl = TRUE)  # Add space after "Age"
+    )
+  
+  max_estimate <- max(abs(lm_coefficients$estimate), na.rm = TRUE)
+  p_value_width <- max(nchar(as.character(round(lm_coefficients$p.value, 3))), na.rm = TRUE) * 0.25
+  
+  # Adjust the x limits dynamically
+  max_x_right <- max_estimate + p_value_width + 1
+  max_x_left <- max_estimate * -1
+  
   ggplot(lm_coefficients, aes(x = term, y = estimate)) +
-    geom_bar(stat = "identity", fill = "white", color = "black") +
-    geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.2) +
-    coord_flip() +
-    geom_text(aes(label = paste0("p = ", round(p.value, 3))), 
-              nudge_y = 4,
-              hjust = 1,
-              size = 5) +  # Add p-values as text labels
+    geom_bar(stat = "identity", color = "black", aes(fill = direction), na.rm = TRUE) +
+    geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.2, na.rm = TRUE) +
+    scale_fill_manual(values = c("Positive" = "#35B779FF", "Negative" = "#FDE725")) +
+    coord_flip(ylim = c(max_x_left, max_x_right)) +
+    geom_text(
+      aes(
+        label = paste0("p = ", round(p.value, 4)),
+        y = ifelse(estimate > 0, conf.high + 0.16, conf.low - 0.16)
+      ),
+      hjust = ifelse(lm_coefficients$estimate > 0, -0.1, 1.2),
+      size = 5,
+      color = "black"
+    ) +
     labs(title = "Coefficient Plot: Effect of Variables on Depression Score", 
          x = "Predictor Variables", 
          y = "Coefficient Estimate") +
-    theme_minimal() +
+    theme_classic() +
     theme(
-      axis.text.y = element_text(size = rel(1.5)),
-      axis.title = element_text(size = rel(1.5))
+      axis.text.y = element_text(size = rel(1.75)),
+      axis.text.x = element_text(size = rel(1.75)),
+      axis.title = element_text(size = rel(1.5)),
+      plot.title = element_text(size = 20, face = "bold"),
+      legend.position = "none"
     )
 }
 
@@ -226,21 +270,49 @@ create_coefficient_plot <- function(data, formula, factor_levels) {
   
   max_estimate <- max(abs(lm_coefficients$estimate), na.rm = TRUE) + 2
   
+  lm_coefficients$direction <- ifelse(lm_coefficients$estimate > 0, "Positive", "Negative")
+  
+  lm_coefficients <- lm_coefficients %>%
+    mutate(
+      term = term %>%
+        gsub("(?<=SES)", " ", ., perl = TRUE) %>%  # Add space after "SES"
+        gsub("(?<=Race)", " ", ., perl = TRUE) %>%  # Add space after "Race"
+        gsub("(?<=Gender)", " ", ., perl = TRUE) %>%  # Add space after "Gender"
+        gsub("(?<=Education)", " ", ., perl = TRUE) %>%  # Add space after "Education"
+        gsub("(?<=Age)", " ", ., perl = TRUE)  # Add space after "Age"
+    )
+  
+  max_estimate <- max(abs(lm_coefficients$estimate), na.rm = TRUE)
+  p_value_width <- max(nchar(as.character(round(lm_coefficients$p.value, 3))), na.rm = TRUE) * 0.25
+  
+  # Adjust the x limits dynamically
+  max_x_right <- max_estimate + p_value_width + 1
+  max_x_left <- max_estimate * -1
+
   ggplot(lm_coefficients, aes(x = term, y = estimate)) +
-    geom_bar(stat = "identity", fill = "white", color = "black") +
-    geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.2) +
-    coord_flip() +
-    geom_text(aes(label = paste0("p = ", round(p.value, 3))), 
-              nudge_y = max_estimate - 4,
-              hjust = 1,
-              size = 5) +  # Add p-values as text labels
+    geom_bar(stat = "identity", color = "black", aes(fill = direction), na.rm = TRUE) +
+    geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.2, na.rm = TRUE) +
+    scale_fill_manual(values = c("Positive" = "#35B779FF", "Negative" = "#FDE725")) +
+    coord_flip(ylim = c(max_x_left, max_x_right)) +
+    geom_text(
+      aes(
+        label = paste0("p = ", round(p.value, 4)),
+        y = ifelse(lm_coefficients$estimate > 0, conf.high + 0.16, conf.low - 0.16)
+      ),
+      hjust = ifelse(lm_coefficients$estimate > 0, -0.1, 1.2),
+      size = 5,
+      color = "black"
+    ) +
     labs(title = "Coefficient Plot: Effect of Variables on Depression Score", 
          x = "Predictor Variables", 
          y = "Coefficient Estimate") +
-    theme_minimal() +
+    theme_classic() +
     theme(
-      axis.text.y = element_text(size = rel(1.5)),
-      axis.title = element_text(size = rel(1.5))
+      axis.text.y = element_text(size = rel(1.75)),
+      axis.text.x = element_text(size = rel(1.75)),
+      axis.title = element_text(size = rel(1.5)),
+      plot.title = element_text(size = 20, face = "bold"),
+      legend.position = "none"
     )
 }
 
@@ -298,8 +370,9 @@ create_default_plotly <- memoise(function(data) {
     
     mca_data$Cluster <- as.factor(res.hpc2$data.clust$clust)
     mca_data$Depression_Category <- demo_data2$Depression_Category
+    viridis_colors <- viridisLite::viridis(256)
     
-    plot_ly(data=mca_data, x=~`Dim 1`, y=~`Dim 2`, z=~`Dim 3`, type="scatter3d", mode="markers", color=~Cluster, colors = "Spectral")
+    plot_ly(data=mca_data, x=~`Dim 1`, y=~`Dim 2`, z=~`Dim 3`, type="scatter3d", mode="markers", color=~Cluster, colors = viridis_colors)
   
 })
 
@@ -357,7 +430,7 @@ create_default_density_plots <- memoise(function(data) {
   
 })
 
-create_mca_cluster <- memoise(function(data, choice) {
+create_mca_cluster <- memoise(function(data, choice, n_clusters) {
     
     demo_data <- data |> 
       select(Depression_Category, Race, Education, SES) |> 
@@ -365,7 +438,12 @@ create_mca_cluster <- memoise(function(data, choice) {
       select(-Depression_Category)
     
     result <- MCA(demo_data, graph=FALSE, ncp = choice)
-    res.hpc2 <- HCPC(result, graph = FALSE)
+    
+    res.hpc2 <- if (is.null(n_clusters)) {
+      HCPC(result, graph = FALSE)  # Automatically decide clusters
+    } else {
+      HCPC(result, graph = FALSE, nb.clust = n_clusters)  # Use user-defined clusters
+    }
     
     #great convex hulls
     fviz_cluster(res.hpc2,
@@ -379,7 +457,7 @@ create_mca_cluster <- memoise(function(data, choice) {
   
 })
 
-create_pca_cluster <- memoise(function(data_type, data, choice) {
+create_pca_cluster <- memoise(function(data_type, data, choice, n_clusters) {
 
     if (data_type == "Dietary") {
       analysis_data <- data |> 
@@ -408,8 +486,13 @@ create_pca_cluster <- memoise(function(data_type, data, choice) {
     comp <- data.frame(fit$x[,1:3])
     comp$type <- ref_dat$Depression_Category
     
-    result <- PCA(analysis_data, scale.unit=TRUE, ncp = choice, graph=T)
-    res.hpc2 <- HCPC(result, graph =FALSE)
+    result <- PCA(analysis_data, scale.unit=TRUE, ncp = choice, graph=FALSE)
+    
+    res.hpc2 <- if (is.null(n_clusters)) {
+      HCPC(result, graph = FALSE)  # Automatically decide clusters
+    } else {
+      HCPC(result, graph = FALSE, nb.clust = n_clusters)  # Use user-defined clusters
+    }
     
     #great convex hulls
     fviz_cluster(res.hpc2,
@@ -423,7 +506,7 @@ create_pca_cluster <- memoise(function(data_type, data, choice) {
   
 })
 
-create_famd_cluster <- memoise(function(data, choice) {
+create_famd_cluster <- memoise(function(data, choice, n_clusters) {
     
     famd_data <- data |> 
       select(Depression_Category, Race, Education, SES, Vitamin_D, White_Blood_Cells, Glucose, GLA_Omega_6, Copper, Saturated_Fatty_Acids, Protein, TotalCalories, Fiber, Cholesterol, Sodium) |> 
@@ -431,7 +514,12 @@ create_famd_cluster <- memoise(function(data, choice) {
       select(-Depression_Category)
     
     result <- FAMD(famd_data, graph=FALSE, ncp = choice)
-    res.hpc2 <- HCPC(result, graph = FALSE)
+    
+    res.hpc2 <- if (is.null(n_clusters)) {
+      HCPC(result, graph = FALSE)  # Automatically decide clusters
+    } else {
+      HCPC(result, graph = FALSE, nb.clust = n_clusters)  # Use user-defined clusters
+    }
     
     #great convex hulls
     fviz_cluster(res.hpc2,
@@ -445,7 +533,7 @@ create_famd_cluster <- memoise(function(data, choice) {
 
 })
 
-create_mca_plotly <- memoise(function(data, choice, color) {
+create_mca_plotly <- memoise(function(data, choice, color, n_clusters) {
     
     demo_data <- data |> 
       select(Depression_Category, Race, Education, SES) |> 
@@ -458,16 +546,22 @@ create_mca_plotly <- memoise(function(data, choice, color) {
     
     result <- MCA(demo_data, graph=FALSE, ncp = choice)
     mca_data <- as.data.frame(result$ind$coord[, 1:3])
-    res.hpc2 <- HCPC(result, graph = FALSE)
+    
+    res.hpc2 <- if (is.null(n_clusters)) {
+      HCPC(result, graph = FALSE)  # Automatically decide clusters
+    } else {
+      HCPC(result, graph = FALSE, nb.clust = n_clusters)  # Use user-defined clusters
+    }
     
     mca_data$Cluster <- as.factor(res.hpc2$data.clust$clust)
     mca_data$Depression_Category <- demo_data2$Depression_Category
+    viridis_colors <- viridisLite::viridis(256)
     
-    plot_ly(data=mca_data, x=~`Dim 1`, y=~`Dim 2`, z=~`Dim 3`, type="scatter3d", mode="markers", color=~get(color), colors = "Spectral")
+    plot_ly(data=mca_data, x=~`Dim 1`, y=~`Dim 2`, z=~`Dim 3`, type="scatter3d", mode="markers", color=~get(color), colors = viridis_colors)
 
 })
 
-create_pca_plotly <- memoise(function(data_type, data, choice, color) {
+create_pca_plotly <- memoise(function(data_type, data, choice, color, n_clusters) {
 
     if (data_type == "Dietary") {
       analysis_data <- data |> 
@@ -499,15 +593,21 @@ create_pca_plotly <- memoise(function(data_type, data, choice, color) {
     
     result <- PCA(analysis_data, scale.unit=TRUE, ncp = choice, graph=FALSE)
     
-    res.hpc2 <- HCPC(result, graph =FALSE)
+    res.hpc2 <- if (is.null(n_clusters)) {
+      HCPC(result, graph = FALSE)  # Automatically decide clusters
+    } else {
+      HCPC(result, graph = FALSE, nb.clust = n_clusters)  # Use user-defined clusters
+    }
     
     ref_dat$Cluster <- as.factor(res.hpc2$data.clust$clust)
+    viridis_colors <- viridisLite::viridis(256)
     
-    plot_ly(data=ref_dat, x=~comp$PC1, y=~comp$PC2, z=~comp$PC3, type="scatter3d", mode="markers", color=~get(color), colors = "Spectral")
+    
+    plot_ly(data=ref_dat, x=~comp$PC1, y=~comp$PC2, z=~comp$PC3, type="scatter3d", mode="markers", color=~get(color), colors = viridis_colors)
 
 })
 
-create_famd_plotly <- memoise(function(data, choice, color) {
+create_famd_plotly <- memoise(function(data, choice, color, n_clusters) {
 
     famd_data <- data |> 
       select(Depression_Category, Race, Education, SES, Vitamin_D, White_Blood_Cells, Glucose, GLA_Omega_6, Copper, Saturated_Fatty_Acids, Protein, TotalCalories, Fiber, Cholesterol, Sodium) |> 
@@ -520,11 +620,18 @@ create_famd_plotly <- memoise(function(data, choice, color) {
     
     result <- FAMD(famd_data, graph=FALSE, ncp = choice)
     famd_data <- as.data.frame(result$ind$coord[, 1:3])
-    res.hpc2 <- HCPC(result, graph = FALSE)
+    
+    res.hpc2 <- if (is.null(n_clusters)) {
+      HCPC(result, graph = FALSE)  # Automatically decide clusters
+    } else {
+      HCPC(result, graph = FALSE, nb.clust = n_clusters)  # Use user-defined clusters
+    }
+    
     famd_data$Cluster <- as.factor(res.hpc2$data.clust$clust)
     famd_data$Depression_Category <- famd_data2$Depression_Category
+    viridis_colors <- viridisLite::viridis(256)
     
-    plot_ly(data=famd_data, x=~Dim.1, y=~Dim.2, z=~Dim.3, type="scatter3d", mode="markers", color=~get(color), colors = "Spectral")
+    plot_ly(data=famd_data, x=~Dim.1, y=~Dim.2, z=~Dim.3, type="scatter3d", mode="markers", color=~get(color), colors = viridis_colors)
 
 })
 
@@ -854,11 +961,15 @@ create_residual_data <- memoise(function(data) {
 })
 
 default_create_model_performance_plot <- memoise(function(data, model) {
+  
   predictions <- augment(model, data)  # add predictions and residuals
   
+  point_color <- viridis(10, option = "D")[2]
+  smooth_color <- viridis(10, option = "D")[8]
+  
   ggplot(predictions, aes(.pred, .resid)) +
-    geom_point(alpha = 0.8, color = "dodgerblue2", shape = 18) +
-    geom_smooth(se = FALSE, color = "red3") +
+    geom_point(alpha = 0.8, color = point_color, shape = 18) +
+    geom_smooth(se = FALSE, color = smooth_color) +
     labs(
       x = "Fitted Values",
       y = "Residuals",
@@ -876,12 +987,16 @@ default_create_model_performance_plot <- memoise(function(data, model) {
 })
 
 create_model_performance_plot <- memoise(function(data, model) {
+  
   predictions <- augment(model, data)  # add predictions and residuals
+  
+  point_color <- viridis(10, option = "D")[2]
+  smooth_color <- viridis(10, option = "D")[8]
   
   if ("resid" %in% colnames(predictions)) {
     ggplot(predictions, aes(.pred, .resid)) +
-      geom_point(alpha = 0.8, color = "dodgerblue2", shape = 18) +
-      geom_smooth(se = FALSE, color = "red3") +
+      geom_point(alpha = 0.8, color = point_color, shape = 18) +
+      geom_smooth(se = FALSE, color = smooth_color) +
       labs(
         x = "Fitted Values",
         y = "Residuals",
@@ -898,8 +1013,8 @@ create_model_performance_plot <- memoise(function(data, model) {
       )
   } else {
   ggplot(predictions, aes(.pred, Total_Depression_Score - .pred)) +
-    geom_point(alpha = 0.8, color = "dodgerblue2", shape = 18) +
-    geom_smooth(se = FALSE, color = "red3") +
+    geom_point(alpha = 0.8, color = point_color, shape = 18) +
+    geom_smooth(se = FALSE, color = smooth_color) +
     labs(
       x = "Fitted Values",
       y = "Residuals",
@@ -918,11 +1033,15 @@ create_model_performance_plot <- memoise(function(data, model) {
 })
 
 create_predicted_vs_actual_plot <- memoise(function(data, model) {
+  
   predictions <- augment(model, data)
   
+  point_color <- viridis(10, option = "D")[2]
+  smooth_color <- viridis(10, option = "D")[8]
+  
   ggplot(predictions, aes(.pred, Total_Depression_Score)) +
-    geom_point(alpha = 0.8, color = "darkgreen", shape = 18) +
-    geom_abline(slope = 1, intercept = 0, color = "magenta", linetype = "dashed") +
+    geom_point(alpha = 0.8, color = point_color, shape = 18) +
+    geom_abline(slope = 1, intercept = 0, color = smooth_color, linetype = "dashed") +
     labs(
       x = "Predicted Score",
       y = "Actual Score",
